@@ -3,9 +3,9 @@ import java.util.Queue;
 import java.util.Random;
 
 public class q2 {
-  public static int n = 10; // number of road segments
-  public static int s = 25; // time interval of vehicle generation
-  public static int d = 100; // time taken to move one road segment
+  public static int n = 5; // number of road segments
+  public static int s = 150; // time interval of vehicle generation
+  public static int d = 50; // time taken to move one road segment
 
   public static void main(String[] args) {
     if (args.length != 3) {
@@ -30,36 +30,55 @@ public class q2 {
     private int currentDirection = 0; // Current direction of traffic flow
     private final int segmentCount; // Number of road segments
     private final int segmentTime; // Time taken to move one road segment
-    private final Queue<Integer> vehicles = new LinkedList<>();
-
-    private int numVichicle = 0;
+    private int nextVId = 1; // Next vehicle that should enter the road
+    private final Queue<Vehicle> vehicles = new LinkedList<>();
+    private int numVichicle = 0; // Num of vehicles on the road
 
     public Road(int segmentCount, int segmentTime) {
       this.segmentCount = segmentCount;
       this.segmentTime = segmentTime;
     }
 
-    public void enter(int vehicleID, int segment, int direction) throws InterruptedException {
+    public void addVehicle(Vehicle vehicle) {
       synchronized (lock) {
-        // Wait if traffic is moving in opposite direction
-        while (currentDirection != 0 && currentDirection != direction) {
-          lock.wait();
-        }
-        currentDirection = direction;
-        numVichicle++;
-        vehicles.add(vehicleID);
-        System.out.println("enter: " + vehicleID + "," + segment);
+        vehicles.add(vehicle);
       }
     }
 
-    public void move(int vehicleID, int segment, int direction) throws InterruptedException {
-      // Move through the road segments
+    public void enter(Vehicle vehicle) throws InterruptedException {
+      synchronized (lock) {
+        Vehicle v = vehicles.peek();
+        int segment = v.segment;
+        int direction = v.direction;
+
+        // First vehicle enters the road when the road is empty
+        if (currentDirection == 0) {
+          currentDirection = direction;
+        }
+        // Wait if traffic is moving in opposite direction or the vehicle is not the next to enter
+        while (currentDirection != direction || vehicle.id != nextVId) {
+          lock.wait();
+        }
+        nextVId++;
+        numVichicle++;
+        System.out.println("enter: " + vehicle.id + "," + segment);
+      }
+    }
+
+    public void move() throws InterruptedException {
+      Vehicle v;
+      synchronized (lock) {
+        v = vehicles.poll();
+      }
+      // Move the vehicles through the road segments concurrently
+      int segment = v.segment;
+      int direction = v.direction;
       for (int i = 0; i < segmentCount - 1; i++) {
         Thread.sleep(segmentTime);
         segment = (segment + direction + segmentCount) % segmentCount; // Move to next segment
-        System.out.println("enter: " + vehicleID + "," + segment);
+        System.out.println("enter: " + v.id + "," + segment);
 
-        // if the vehicle enter from residential area, it will leave beforehand
+        // If the vehicle enters from residential area, it will leave the road beforehand
         if (segment == 0 || segment == segmentCount - 1) {
           break;
         }
@@ -67,17 +86,21 @@ public class q2 {
       }
     }
 
-    public void exit(int vehicleID) {
+    public void exit(Vehicle vehicle) {
       synchronized (lock) {
-        System.out.println("exit: " + vehicleID);
         numVichicle--;
+        System.out.println("exit: " + vehicle.id);
         if (numVichicle == 0) {
-          currentDirection = 0;
+          if (vehicles.peek() == null) {
+            currentDirection = 0;
+          } else {
+            // Let the next in order vehicle to enter the road and set the direction
+            currentDirection = vehicles.peek().direction;
+          }
           lock.notifyAll();
         }
       }
     }
-
 
   }
 
@@ -109,18 +132,24 @@ public class q2 {
             entryPoint = road.segmentCount - 1;
             direction = -1;
           } else {
+            // enter at residential area
             entryPoint = rand.nextInt(road.segmentCount - 2) + 1;
             direction = rand.nextBoolean() ? 1 : -1;
           }
-
-          try {
-            System.out.println("car: " + id + "," + "entry point:" +
-              entryPoint + "," + "direction:" + direction);
-            road.enter(id, entryPoint, direction);
-            new Thread(new Vehicle(id++, entryPoint, direction, road)).start();
-          } catch (InterruptedException e) {
-            e.printStackTrace();
-          }
+          Vehicle vehicle = new Vehicle(id++, entryPoint, direction);
+          road.addVehicle(vehicle);
+          System.out.println("car: " + vehicle.id + "," + "entry point:" +
+            entryPoint + "," + "direction:" + direction);
+          // start a new thread that is responsible for moving a vehicle
+          new Thread(() -> {
+            try {
+              road.enter(vehicle);
+              road.move();
+              road.exit(vehicle);
+            } catch (InterruptedException e) {
+              e.printStackTrace();
+            }
+          }).start();
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
@@ -128,27 +157,15 @@ public class q2 {
     }
   }
 
-  static class Vehicle implements Runnable {
+  static class Vehicle {
     private final int id;
     private int segment;
     private final int direction;
-    private final Road road;
 
-    public Vehicle(int id, int segment, int direction, Road road) {
+    public Vehicle(int id, int segment, int direction) {
       this.id = id;
       this.segment = segment;
       this.direction = direction;
-      this.road = road;
-    }
-
-    @Override
-    public void run() {
-      try {
-        road.move(id, segment, direction);
-        road.exit(id);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
     }
   }
 }
