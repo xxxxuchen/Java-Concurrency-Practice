@@ -48,7 +48,6 @@ public class q1n {
         }
       } catch (InterruptedException e) {
         // Thread interrupted, terminate gracefully
-        System.out.println("spawn thread terminated!");
       }
     });
     spawnThread.start();
@@ -154,24 +153,39 @@ public class q1n {
     }
 
     public void moveCharacter(Cell source, Cell target) throws InterruptedException {
-      // acquire its source lock first, then use try lock to acquire the target lock
-      cellLocks[source.x][source.y].lockInterruptibly();
-      if (cellLocks[target.x][target.y].tryLock()) {
-        // move the character
-        grid[target.x][target.y] = grid[source.x][source.y];
-        grid[source.x][source.y] = null;
-        successCounter.incrementAndGet();
-        cellLocks[target.x][target.y].unlock();
-        cellLocks[source.x][source.y].unlock();
+      // Sort the cells to acquire locks in a consistent order to prevent deadlock
+      Cell firstCell;
+      Cell secondCell;
+      if (source.hashCode() < target.hashCode()) {
+        firstCell = source;
+        secondCell = target;
       } else {
-        // terminate both characters
-        if (grid[source.x][source.y] != null) grid[source.x][source.y].interrupt();
-        if (grid[target.x][target.y] != null) grid[target.x][target.y].interrupt();
-        // remove both character in the grid
-        grid[source.x][source.y] = null;
-        grid[target.x][target.y] = null;
-        System.out.println("collision detected!");
-        cellLocks[source.x][source.y].unlock();
+        firstCell = target;
+        secondCell = source;
+      }
+      // Acquire locks for both the source and target cells
+      cellLocks[firstCell.x][firstCell.y].lock();
+      cellLocks[secondCell.x][secondCell.y].lock();
+
+      try {
+        // Check if the target cell is empty
+        if (grid[target.x][target.y] == null) {
+          // Move the character to the target cell
+          grid[target.x][target.y] = grid[source.x][source.y];
+          grid[source.x][source.y] = null;
+          successCounter.incrementAndGet();
+        } else {
+          // If there is a collision, remove both characters from the grid and return false
+          System.out.println("collision detected!");
+          grid[source.x][source.y].interrupt();
+          grid[target.x][target.y].interrupt();
+          grid[source.x][source.y] = null;
+          grid[target.x][target.y] = null;
+        }
+      } finally {
+        // Release the locks
+        cellLocks[firstCell.x][firstCell.y].unlock();
+        cellLocks[secondCell.x][secondCell.y].unlock();
       }
     }
 

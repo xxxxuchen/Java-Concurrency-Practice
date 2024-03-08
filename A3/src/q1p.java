@@ -197,7 +197,6 @@ public class q1p {
           System.out.println("collision detected!");
           grid[source.x][source.y] = null;
           grid[target.x][target.y] = null;
-          // Increment the success counter since a collision occurred
           return false;
         }
       } finally {
