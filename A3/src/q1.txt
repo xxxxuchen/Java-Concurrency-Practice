@@ -1,0 +1,46 @@
+non-pool:
+m=n=30, s=100, average success moves: 4538
+m=n=30, s=50, average success moves: 6362
+m=n=30, s=20, average success moves: 9102
+
+pool:
+t=500
+m=n=30, s=100, average success moves: 4979
+m=n=30, s=50, average success moves: 6913
+m=n=30, s=20, average success moves: 9817
+
+t=100
+m=n=30, s=100, average success moves: 4722
+m=n=30, s=50, average success moves: 6815
+m=n=30, s=20, average success moves: 9740
+
+t=50
+m=n=30, s=100, average success moves: 4913
+m=n=30, s=50, average success moves: 6784
+m=n=30, s=20, average success moves: 9771
+
+t=10
+m=n=30, s=100, average success moves: 5
+m=n=30, s=50, average success moves: 4
+m=n=30, s=20, average success moves: 5
+
+my pooling strategy:
+
+I chose to apply a forked multitask approach. Basically, a task can spawn multiple tasks.
+Each character will first submit a task that computes its movement plan, once the plan is computed, for each moves of
+its plan, an individual movement task (only if the move is succeed) is submitted to the pool. So multiple characters can
+compute is movement plan and moves towards their destination concurrently.
+After the initial n characters are started, there is also a task submitted which repeatedly generates new characters.
+And for each character, different tasks are submitted the same way as described above.
+
+Program Results Explanation:
+Based on my pooling strategy, the above data can be explained as follows:
+There should be at least n threads in the pool, t > n, so that the pool can handle the initial n characters concurrently.
+if t < n, the queue will be congested by the tasks of movement plan, the movement tasks and the new character spawning task
+will be delayed. Especially for the new character spawning task(since it is submitted after the n characters started),
+causing it hard to compensate the cancellation of the characters, which results in the low success moves.
+
+Once the pool size is greater than n, you can observe from the data above that the pool version has a better performance
+than the non-pool version. The number of threads (t > n) does not make much difference in terms of pool version. But they
+do make a difference in terms of non-pool version, as there is less overhead of thread creation, interruption, etc.
+

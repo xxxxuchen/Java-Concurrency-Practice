@@ -28,19 +28,30 @@ public class q1n {
     for (int i = 0; i < n; i++) {
       try {
         characters.add(game.placeAtPerimeter());
-      } catch (InterruptedException e) {
-        e.printStackTrace();
+      } catch (CollisionAtPerimeterException e) {
+        // collision detected, retry
+        i--;
       }
+    }
+
+    // start the movement of the characters
+    for (Character character : characters) {
+      character.start();
     }
 
 
     // create another thread that generates a random character on perimeter every s milliseconds
     Thread spawnThread = new Thread(() -> {
       try {
-        while (true) {
+        while (!Thread.currentThread().isInterrupted()) {
           Thread.sleep(s);
-          Character c = game.placeAtPerimeter();
-//          System.out.println(game);
+          Character c = null;
+          try {
+            c = game.placeAtPerimeter();
+          } catch (CollisionAtPerimeterException e) {
+            // collision detected, retry
+            continue;
+          }
           synchronized (characters) {
             characters.add(c);
           }
@@ -71,7 +82,7 @@ public class q1n {
       e.printStackTrace();
     }
 
-    System.out.println(Game.successCounter);
+    System.out.println("total sum of successful moves: " + Game.successCounter.get());
 
   }
 
@@ -93,7 +104,7 @@ public class q1n {
       }
     }
 
-    public Character placeAtPerimeter() throws InterruptedException {
+    public Character placeAtPerimeter() throws CollisionAtPerimeterException {
       Random rand = new Random();
       int x, y;
 
@@ -104,47 +115,40 @@ public class q1n {
       switch (side) {
         case 0: // Top side
           x = 0;
-          do {
-            y = rand.nextInt(gridSize);
-            character = tryPlaceCharacter(x, y);
-          } while (character == null);
+          y = rand.nextInt(gridSize);
+          character = tryPlaceCharacter(x, y);
           break;
         case 1: // Right side
           y = gridSize - 1;
-          do {
-            x = rand.nextInt(gridSize);
-            character = tryPlaceCharacter(x, y);
-          } while (character == null);
+          x = rand.nextInt(gridSize);
+          character = tryPlaceCharacter(x, y);
           break;
         case 2: // Bottom side
           x = gridSize - 1;
-          do {
-            y = rand.nextInt(gridSize);
-            character = tryPlaceCharacter(x, y);
-          } while (character == null);
+          y = rand.nextInt(gridSize);
+          character = tryPlaceCharacter(x, y);
           break;
         case 3: // Left side
           y = 0;
-          do {
-            x = rand.nextInt(gridSize);
-            character = tryPlaceCharacter(x, y);
-          } while (character == null);
-          break;
-        default:
-          x = 0;
-          y = 0;
+          x = rand.nextInt(gridSize);
+          character = tryPlaceCharacter(x, y);
           break;
       }
       return character;
     }
 
-    private Character tryPlaceCharacter(int x, int y) throws InterruptedException {
+    private Character tryPlaceCharacter(int x, int y) throws CollisionAtPerimeterException {
       Character character = null;
-      cellLocks[x][y].lockInterruptibly();
+      cellLocks[x][y].lock();
       try {
         if (grid[x][y] == null) {
           character = new Character(this, new Cell(x, y));
           grid[x][y] = character;
+        } else {
+          grid[x][y].interrupt();
+          grid[x][y] = null;
+          // throw collision exception
+          throw new CollisionAtPerimeterException("collision detected!");
         }
       } finally {
         cellLocks[x][y].unlock();
@@ -168,6 +172,9 @@ public class q1n {
       cellLocks[secondCell.x][secondCell.y].lock();
 
       try {
+        if (grid[source.x][source.y] == null) {
+          throw new InterruptedException();
+        }
         // Check if the target cell is empty
         if (grid[target.x][target.y] == null) {
           // Move the character to the target cell
@@ -176,7 +183,7 @@ public class q1n {
           successCounter.incrementAndGet();
         } else {
           // If there is a collision, remove both characters from the grid and return false
-          System.out.println("collision detected!");
+//          System.out.println("collision detected!");
           grid[source.x][source.y].interrupt();
           grid[target.x][target.y].interrupt();
           grid[source.x][source.y] = null;
@@ -289,8 +296,8 @@ public class q1n {
   }
 
   static class Cell {
-    public int x;
-    public int y;
+    private int x;
+    private int y;
 
     public Cell(int x, int y) {
       this.x = x;
@@ -303,5 +310,11 @@ public class q1n {
     }
   }
 
+  // customs CollisionAtPerimeterException
+  private static class CollisionAtPerimeterException extends Exception {
+    public CollisionAtPerimeterException(String message) {
+      super(message);
+    }
+  }
 }
 

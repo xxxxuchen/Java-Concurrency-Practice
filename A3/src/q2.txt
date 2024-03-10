@@ -1,0 +1,31 @@
+Lock-free stack
+public static int x = 0; // 0 for lock-free stack, 1 for elimination stack
+public static int t = 1000; // number of threads
+public static int n = 1500; // number of operations per thread
+public static int s = 5; // 0-s range of sleep time after each operation
+public static int e = 500; // capacity of the elimination array
+public static int w = 50; // timeout for exchanger
+
+11.389s
+
+===========================================================================
+Elimination stack
+public static int x = 1; // 0 for lock-free stack, 1 for elimination stack
+public static int t = 1000; // number of threads
+public static int n = 1500; // number of operations per thread
+public static int s = 5; // 0-s range of sleep time after each operation
+public static int e = 500; // capacity of the elimination array
+public static int w = 50; // timeout for exchanger
+
+9.88s
+
+I found that the elimination stack is faster than the lock free stack only when there are a large number of threads
+running concurrently on the system. Otherwise, the lock free stack seems always to be faster.
+
+If the number of threads is not large enough, in order to make the elimination stack faster (close to the lock free stack),
+the timeout  w needs to be set to a small value, smaller than s. The capacity of the elimination array e also needs to be
+set to a small value which around the number of cores of my machine. This way, the elimination stack behaves more like a
+lock free stack.
+However, when the number of threads is large (t >= 1000), the elimination stack is faster than the lock free stack. The
+difference is more significant when e is set to t/2, and w > s. This way, the elimination stack can take full advantage of
+the exchangers in the array to reduce the huge contention of the lock happens in the lock free stack.

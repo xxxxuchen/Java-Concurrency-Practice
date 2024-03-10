@@ -10,7 +10,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class q1p {
   public static int m = 30;
   public static int n = 30;
-  public static int s = 20;
+  public static int s = 100;
   public static int t = 50;
 
   public static void main(String[] args) {
@@ -38,7 +38,7 @@ public class q1p {
     for (Character character : characters) {
       gameExecutor.submit(() -> {
         try {
-          character.move(gameExecutor);
+          character.submitMovePlan(gameExecutor);
         } catch (InterruptedException | ExecutionException e) {
           // Thread interrupted, terminate gracefully
         }
@@ -53,16 +53,14 @@ public class q1p {
           Character c = game.placeAtPerimeter();
           gameExecutor.submit(() -> {
             try {
-              c.move(gameExecutor);
+              c.submitMovePlan(gameExecutor);
             } catch (InterruptedException | ExecutionException e) {
               // Thread interrupted, terminate gracefully
-              System.out.println("character thread terminated!");
             }
           });
         }
       } catch (InterruptedException e) {
         // Thread interrupted, terminate gracefully
-        System.out.println("spawn thread terminated!");
       }
     });
 
@@ -76,15 +74,13 @@ public class q1p {
     gameExecutor.shutdownNow();
 
     // wait for all threads to terminate
-
     try {
       gameExecutor.awaitTermination(60, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
 
-    System.out.println(Game.successCounter);
-
+    System.out.println("total sum of successful moves: " + Game.successCounter.get());
   }
 
 
@@ -182,6 +178,7 @@ public class q1p {
       cellLocks[secondCell.x][secondCell.y].lock();
 
       try {
+        // it is removed because of the collision, return false
         if (grid[source.x][source.y] == null) {
           return false;
         }
@@ -194,7 +191,7 @@ public class q1p {
           return true;
         } else {
           // If there is a collision, remove both characters from the grid and return false
-          System.out.println("collision detected!");
+//          System.out.println("collision detected!");
           grid[source.x][source.y] = null;
           grid[target.x][target.y] = null;
           return false;
@@ -218,13 +215,14 @@ public class q1p {
       this.position = position;
     }
 
-    public void move(ExecutorService gameExecutor) throws InterruptedException, ExecutionException {
+    public void submitMovePlan(ExecutorService gameExecutor) throws InterruptedException, ExecutionException {
       while (!Thread.currentThread().isInterrupted()) {
         Cell cell = generateRandomDest();
         Cell copyCell = new Cell(position.x, position.y);
         Cell[] plan = computeMovingPlan(copyCell, cell);
         for (int i = 1; i < plan.length; i++) {
           Cell target = plan[i];
+          // submit each individual movement as a task
           Future<Boolean> isSuccess = gameExecutor.submit(() -> {
             if (game.moveCharacter(position, target)) {
               position = target;
@@ -235,6 +233,7 @@ public class q1p {
           if (isSuccess.get()) {
             Thread.sleep(20);
           } else {
+            // there is a collision, terminate the character thread
             return;
           }
         }

@@ -5,13 +5,12 @@ import java.util.concurrent.atomic.AtomicStampedReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.Exchanger;
 
-public class Main {
-
+public class q2 {
   public static int x = 1; // 0 for lock-free stack, 1 for elimination stack
-  public static int t = 10; // number of threads
-  public static int n = 20; // number of operations per thread
-  public static int s = 10; // 0-s range of sleep time after each operation
-  public static int e = 20; // capacity of the elimination array
+  public static int t = 1500; // number of threads
+  public static int n = 1500; // number of operations per thread
+  public static int s = 5; // 0-s range of sleep time after each operation
+  public static int e = 500; // capacity of the elimination array
   public static int w = 50; // timeout for exchanger
 
   private static int LAST_N_NODES = 50;
@@ -57,7 +56,11 @@ public class Main {
     }
     long endTime = System.currentTimeMillis();
     int stackSize = stack.size();
-    System.out.println("Time taken: " + (endTime - startTime) + "ms" + " Number of nodes remaining: " + stackSize);
+    // ms
+    long timeTaken = endTime - startTime;
+    // s
+    double timeTakenInSeconds = timeTaken / 1000.0;
+    System.out.println("Time taken: " + timeTaken + "ms" + "/" + timeTakenInSeconds + "s" + " Number of nodes remaining: " + stackSize);
 
   }
 
@@ -73,7 +76,7 @@ public class Main {
     }
 
     @Override
-    public void run()  {
+    public void run() {
       Random random = new Random();
       for (int i = 0; i < n; i++) {
         if (random.nextBoolean()) {
@@ -82,7 +85,7 @@ public class Main {
           try {
             stack.pop();
           } catch (EmptyStackException e) {
-            System.out.println("stack is empty");
+//            System.out.println("stack is empty");
           }
         }
         try {
@@ -99,7 +102,15 @@ public class Main {
     private AtomicStampedReference<Node<T>> head = new AtomicStampedReference<>(null, 0);
     protected AtomicInteger counter = new AtomicInteger(0);
 
+    // maintain the last 50 nodes popped from the stack
+    private static ThreadLocal<BoundedStack<Node>> localStack =
+      ThreadLocal.withInitial(() -> new BoundedStack<>(LAST_N_NODES));
+
     protected boolean tryPush(Node v) {
+      Node oldNode = localStack.get().pop();
+      if (oldNode != null && Math.random() < 0.5) {
+        v = oldNode;
+      }
       int[] stampHolder = new int[1];
       Node<T> currentHeadNode = head.get(stampHolder);
       v.next = currentHeadNode;
@@ -108,10 +119,11 @@ public class Main {
 
     public void push(T value) {
       Node<T> newHeadNode = new Node<>(value);
+
       while (!tryPush(newHeadNode)) {
 //        LockSupport.parkNanos(1);
       }
-      System.out.println("pushed " + value);
+//      System.out.println("pushed " + value);
       counter.incrementAndGet();
     }
 
@@ -124,18 +136,20 @@ public class Main {
       }
       Node<T> newHeadNode = currentHeadNode.next;
       if (head.compareAndSet(currentHeadNode, newHeadNode, stampHolder[0], stampHolder[0] + 1)) {
+        currentHeadNode.next = null;
+        localStack.get().push(currentHeadNode);
         return currentHeadNode;
       } else {
         return null;
       }
     }
 
-    public T pop() throws EmptyStackException{
+    public T pop() throws EmptyStackException {
       Node<T> returnNode;
       while (true) {
         returnNode = tryPop();
         if (returnNode != null) {
-          System.out.println("popped " + returnNode.value);
+//          System.out.println("popped " + returnNode.value);
           counter.decrementAndGet();
           return returnNode.value;
         } else {
@@ -156,8 +170,6 @@ public class Main {
 
     private int timeOut;
 
-    private static ThreadLocal<BoundedStack<Node>> localStack =
-      ThreadLocal.withInitial(() -> new BoundedStack<>(LAST_N_NODES));
 
     public EliminationStack(int capacity, int timeOut) {
       exchangers = (Exchanger<T>[]) new Exchanger[capacity];
@@ -174,10 +186,6 @@ public class Main {
      */
     public void push(T value) {
       Node newNode = new Node(value);
-      Node oldNode = localStack.get().pop();
-      if (oldNode != null && Math.random() < 0.5) {
-        newNode = oldNode;
-      }
       while (true) {
         if (tryPush(newNode)) {
           counter.incrementAndGet();
@@ -203,16 +211,13 @@ public class Main {
       while (true) {
         returnNode = tryPop();
         if (returnNode != null) {
-          returnNode.next = null;
           counter.decrementAndGet();
-          localStack.get().push(returnNode);
           return returnNode.value;
         } else {
           int randomIndex = (int) (Math.random() * exchangers.length);
           try {
             Node otherNode = (Node) exchangers[randomIndex].exchange(null, timeOut, java.util.concurrent.TimeUnit.MILLISECONDS);
             if (otherNode != null) {
-              localStack.get().push(otherNode);
               return (T) otherNode.value;
             }
           } catch (InterruptedException e) {
