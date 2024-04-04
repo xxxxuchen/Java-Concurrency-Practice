@@ -34,14 +34,7 @@ public class q2 {
       stack = new EliminationStack<>(e, w);
     }
 
-
-    /**
-     * stack is tested by starting t threads that attempt PUSH or POP
-     * operations on the stack, each operation being either a push or pop, selected with even odds.
-     * After each push/pop operation, a thread sleeps for a random time, 0–s ms.
-     * Each thread will attempt to perform n operations
-     */
-
+    // create t threads which each perform n operations on the stack
     Thread[] threads = new Thread[t];
     for (int i = 0; i < t; i++) {
       threads[i] = new Thread(new StackOperationThread(stack, n, s));
@@ -56,10 +49,8 @@ public class q2 {
     }
     long endTime = System.currentTimeMillis();
     int stackSize = stack.size();
-    // ms
-    long timeTaken = endTime - startTime;
-    // s
-    double timeTakenInSeconds = timeTaken / 1000.0;
+    long timeTaken = endTime - startTime; // ms
+    double timeTakenInSeconds = timeTaken / 1000.0; // s
     System.out.println("Time taken: " + timeTaken + "ms" + "/" + timeTakenInSeconds + "s" + " Number of nodes remaining: " + stackSize);
 
   }
@@ -85,6 +76,7 @@ public class q2 {
           try {
             stack.pop();
           } catch (EmptyStackException e) {
+            // stack is empty, ignore and continue the loop
 //            System.out.println("stack is empty");
           }
         }
@@ -108,6 +100,7 @@ public class q2 {
 
     protected boolean tryPush(Node v) {
       Node oldNode = localStack.get().pop();
+      // reuse the old node
       if (oldNode != null && Math.random() < 0.5) {
         v = oldNode;
       }
@@ -179,11 +172,6 @@ public class q2 {
       this.timeOut = timeOut;
     }
 
-    /**
-     * A thread may PUSH either a newly allocated node, or use an old, previously popped node.
-     * To support the latter it should retain the last 50 nodes it has popped, and when performing a PUSH,
-     * if it has any old nodes stored, then 50% of the time it should reuse an old node.
-     */
     public void push(T value) {
       Node newNode = new Node(value);
       while (true) {
@@ -200,7 +188,7 @@ public class q2 {
           } catch (InterruptedException e) {
             e.printStackTrace();
           } catch (TimeoutException e) {
-            // retry
+            // retry the lock free stack push
           }
         }
       }
@@ -223,7 +211,7 @@ public class q2 {
           } catch (InterruptedException e) {
             e.printStackTrace();
           } catch (TimeoutException e) {
-            // retry
+            // retry the lock free stack pop
           }
         }
       }
@@ -233,7 +221,7 @@ public class q2 {
 
   private static class BoundedStack<T> {
     private int maxSize;
-    private Deque<T> stack;
+    private Deque<T> stack; // hold the last maxSize popped nodes
 
     public BoundedStack(int maxSize) {
       this.maxSize = maxSize;

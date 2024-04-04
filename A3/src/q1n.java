@@ -244,7 +244,7 @@ public class q1n {
 
 
     /*
-     For this use the Bresenham algorithm to compute the series of steps forming a “straight” line
+     Bresenham algorithm to compute the series of steps forming a “straight” line
      to their goal, given the 8-way movement model.
      */
     private Cell[] computeMovingPlan(Cell source, Cell target) {

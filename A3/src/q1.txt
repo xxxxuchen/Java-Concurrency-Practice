@@ -40,7 +40,8 @@ if t < n, the queue will be congested by the tasks of movement plan, the movemen
 will be delayed. Especially for the new character spawning task(since it is submitted after the n characters started),
 causing it hard to compensate the cancellation of the characters, which results in the low success moves.
 
-Once the pool size is greater than n, you can observe from the data above that the pool version has a better performance
-than the non-pool version. The number of threads (t > n) does not make much difference in terms of pool version. But they
-do make a difference in terms of non-pool version, as there is less overhead of thread creation, interruption, etc.
+Once the pool size is greater than n, the data above demonstrates that the pool version has a better performance than
+the non-pool version. The number of threads (t > n) does not make much difference in terms of pool version. But they
+do make a difference in terms of non-pool version, as there is less overhead of thread creation, interruption. And the
+movements of the a character are break down into smaller and shorter tasks, which may brings more concurrency.
 

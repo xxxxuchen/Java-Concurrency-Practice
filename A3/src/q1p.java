@@ -36,6 +36,7 @@ public class q1p {
     }
 
     for (Character character : characters) {
+      // each character submit a move plan task which will spawns their individual movement tasks
       gameExecutor.submit(() -> {
         try {
           character.submitMovePlan(gameExecutor);
@@ -241,8 +242,8 @@ public class q1p {
     }
 
     /*
-     For this use the Bresenham algorithm to compute the series of steps forming a “straight” line
-     to their goal, given the 8-way movement model.
+     Bresenham algorithm to compute the series of steps forming a “straight” line
+     to their destination, given the 8-way movement model.
      */
     Cell[] computeMovingPlan(Cell source, Cell target) {
       List<Cell> plan = new ArrayList<>();
